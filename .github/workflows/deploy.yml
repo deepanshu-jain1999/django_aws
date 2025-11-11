@@ -46,5 +46,5 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          cd /home/ec2-user/app
+          cd /home/ubuntu
           ./deploy.sh
