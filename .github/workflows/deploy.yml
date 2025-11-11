@@ -3,7 +3,7 @@ name: Deploy to AWS
 on:
   push:
     branches:
-      - master  # or 'main'
+      - main
 
 env:
   AWS_REGION: us-east-1
