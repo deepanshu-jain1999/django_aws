@@ -1,0 +1,53 @@
+version: 0.2
+
+# Environment variables can be passed from CodeBuild project
+# We'll set these in AWS Console: AWS_ACCOUNT_ID, AWS_DEFAULT_REGION, IMAGE_REPO_NAME
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      # Login to ECR so we can push images
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+      # Set image repository URI
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+
+      # Create a unique tag using git commit hash (first 7 characters)
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+
+      - echo Repository URI is $REPOSITORY_URI
+      - echo Image tag is $IMAGE_TAG
+
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+
+      # Build Docker image
+      - docker build -t $REPOSITORY_URI:latest .
+
+      # Tag image with commit hash for versioning
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+
+      - echo Build completed on `date`
+
+  post_build:
+    commands:
+      - echo Pushing the Docker images...
+
+      # Push both tags to ECR
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+
+      - echo Image pushed successfully
+      - echo Writing image definitions file for deployment...
+
+      # Create imagedefinitions.json (used if you use ECS deployment)
+      - printf '[{"name":"django-app","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+
+# Artifacts are files passed to the next stage (Deploy stage)
+artifacts:
+  files:
+    - imagedefinitions.json
